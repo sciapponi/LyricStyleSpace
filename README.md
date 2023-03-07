@@ -1,5 +1,11 @@
 # LyricStyleSpace
 
+### Authors:
+
+- Tommaso Cortecchia (tommaso.cortecchia@studio.unibo.it)
+- Stefano Ciapponi (stefano.ciapponi@studio.unibo.it)
+- Mazeyar Moeini (mazeyar.moeini@studio.unibo.it)
+
 Natural Language Processing Project
 
 ### Project Description:
