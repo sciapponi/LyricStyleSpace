@@ -10,4 +10,5 @@ Natural Language Processing Project
 
 ### Project Description:
 
-- The Aim of this project is Building a Deep Metric Learning Model which is Able to compute a distance between popular song lyrics (downloaded from Genius).
+- The Aim of this project is investigating Deep Metric Learning techniques to compute a distance between popular song lyrics (downloaded from Genius). 
+- These techniques could be easily thought as part of a back-end for a Song Reccomendation System.
