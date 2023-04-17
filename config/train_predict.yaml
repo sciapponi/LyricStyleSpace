@@ -1,14 +1,20 @@
 deterministic: true
 seed : 42
 data_path: "data/data_self_dump.json"
-log_dir: "logs"
 model_ckpt: "bert-base-uncased"
+device: "cpu" #"cuda"
 train:
   lr: 0.0005
-  # Training hyperparameters
+  n_epochs: 1 #5
   n_support : 4
   n_query : 5
-  n_episodes : 20
+  n_episodes : 1 #20
   n_classes : 3
   eval_batch_size : 16
-  num_epochs: 5
+  output_dir: "out"
+  max_grad_norm: 0
+
+
+logging:
+  log_dir: "logs"
+  log_interval: 1 #episodes

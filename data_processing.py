@@ -3,7 +3,6 @@ from datasets import load_dataset, DatasetDict
 from transformers import AutoTokenizer
 from torch.utils.data import Dataset
 
-
 # Dataset Wrapper
 class MyDataset(Dataset):
     def __init__(self,dataset) -> None:
@@ -39,8 +38,8 @@ def load(data_path):
 	tvs_mapped_dataset = tts_mapped_dataset['test'].train_test_split(train_size=0.5,stratify_by_column='artist')
 
 	return DatasetDict({'train': tts_mapped_dataset['train'],
-    									'	test':tvs_mapped_dataset['test'],
-    										'val': tvs_mapped_dataset['train']})
+                        'test':tvs_mapped_dataset['test'],
+                        'val': tvs_mapped_dataset['train']})
 
 def prepare_train_features(tokenizer, examples):
 
