@@ -1,0 +1,11 @@
+Files:
+
+- train.py (main)
+- models.py
+- create_dataset.py
+
+Notes:
+
+- Use tensorboard
+- preprocessing -> create_dataset.py
+- argparse -> Da gestire (hydra con config-> Dalla config folder)

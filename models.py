@@ -1,4 +1,7 @@
 import torch
+from torch import nn
+import pytorch_lightning as pl
+from transformers import AutoModel
 
 # NN Model
 class PrototypicalTransformerModel(nn.Module):
