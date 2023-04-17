@@ -1,8 +1,9 @@
 Files:
 
 - train.py (main)
-- models.py
+- models.py - done
 - create_dataset.py
+- utils.py
 
 Notes:
 

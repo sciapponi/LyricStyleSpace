@@ -1,7 +1,8 @@
 import torch
 from torch import nn
-import pytorch_lightning as pl
 from transformers import AutoModel
+from torch import Tensor
+from typing import Tuple, Iterator, Dict, Any, Sequence, Optional, Union
 
 # NN Model
 class PrototypicalTransformerModel(nn.Module):
@@ -118,109 +119,3 @@ class MetricTransformerModel(torch.nn.Module):
         for layer in self.dense_layers: 
           output = torch.nn.functional.relu(layer(output))
         return output
-
-def train(model, loss_func, mining_func, device, train_loader, optimizer, epoch):
-    model.train()
-    # Train your model
-    for batch_idx,batch in enumerate(tqdm(train_loader)):
-        # Extract the input ids and attention masks from the batch
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        labels = batch['labels'].to(device)
-        
-        # Encode the inputs using the pre-trained model
-        embeddings = model(input_ids=input_ids, attention_mask=attention_mask)
-        # print(embeddings)
-        indices_tuple = mining_func(embeddings, labels)
-        loss = loss_func(embeddings, labels, indices_tuple)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % 20 == 0:
-            print(
-                "\tEpoch {} Iteration {}:  Number of mined triplets = {}".format(
-                    epoch, batch_idx, mining_func.num_triplets
-                )
-            )
-
-    # Print the loss every epoch
-    # print('\tEpoch [{}/{}], Loss: {}'.format(epoch, epochs, loss.item()))
-
-def get_all_embeddings(dataloader, model):
-  model.eval()
-  embeddings, labels = [], []
-  with torch.no_grad():
-    for idx, batch in enumerate(tqdm(dataloader)):
-      input_ids, attention_mask, label = batch['input_ids'].to(device), batch['attention_mask'].to(device), batch['labels'].to(device)
-      embeddings.append(model(input_ids=input_ids, attention_mask=attention_mask))
-      labels.append(label)
-
-  return torch.vstack(embeddings), torch.cat(labels)
-
-def test(train_loader, test_loader, model, accuracy_calculator):
-  train_embeddings, train_labels = get_all_embeddings(train_loader, model)
-  test_embeddings, test_labels = get_all_embeddings(test_loader, model)
-  accuracies = accuracy_calculator.get_accuracy(test_embeddings, test_labels, train_embeddings, train_labels)
-
-  print(f"Test set accuracy (Precision@1) = {accuracies['precision_at_1']}")
-
-
-# LIGHTNING MODEL FOR TRAINING
-class LyricStyleModel(pl.LightningModule):
-
-    def __init__(self, config=None):
-
-        super(LyricStyleModel, self).__init__()
-
-        #training parameters
-        self.learning_rate = config.learning_rate
-        self.num_epochs = config.train.num_epochs
-        self.batch_size = config.train.batch_size
-        
-        self.loss_fn = torch.nn.CrossEntropyLoss()
-
-        #model config
-        if config.model == "Prototype":
-            self.net = PrototypicalTransformerModel(model_ckpt='bert-base-uncased',output_dim=config.num_classes)
-        else:
-            raise Exception(f" {config.model} model Not Yet implemented!")
-
-    def forward(self, x):
-
-        out = self.net(x)
-
-        return out
-
-    def configure_optimizers(self):
-        opt = torch.optim.Adam(
-            self.parameters(),
-            lr=self.learning_rate,
-        )
-
-        return {
-            "optimizer": opt,
-            "lr_scheduler": {
-                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    opt,
-                    patience=20,
-                    verbose=True,
-                ),
-                "monitor": "val_loss",
-            },
-        }
-
-    def training_step(self, batch, batch_idx):
-        query_input_ids,query_attention_mask,query_label,support_input_ids,support_attention_mask,support_label = batch
-
-        # Compute loss
-        pred = self.net(query_input_ids,query_attention_mask, support_input_ids,support_attention_mask,support_label)
-        loss = self.loss_fn(pred, query_label)
-        
-
-        self.log(
-            "train_loss", loss, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
-
-        return loss
-
-    # def test_step(self):
-    #     pass
