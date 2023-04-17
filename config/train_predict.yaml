@@ -1,0 +1,14 @@
+num_classes: 16
+deterministic: true
+seeds : [42, ]
+data_path: "data"
+train:
+  lr: 0.0005
+  batch_size: 32
+  # Training hyperparameters
+  n_support : 4
+  n_query : 5
+  n_episodes : 20
+  n_classes : 3
+  eval_batch_size : 16
+  num_epochs: 5
