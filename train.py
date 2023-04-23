@@ -2,6 +2,8 @@ import os
 import random
 
 import hydra
+import wandb
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -128,10 +130,33 @@ def test_step(model,train_eval_sampler,val_sampler,loss_fn):
       val_metric = (pred.argmax(dim=1) == target).float().mean().item()
   return val_loss,val_metric
 
+
+
+
+
 # Training Loop
 @hydra.main(version_base=None, config_path='config', config_name='train_predict')
 def train(cfg)-> None:
 	
+	    lr: 0.0005
+  n_epochs: 1 #5
+  n_support : 4
+  n_query : 5
+  n_episodes : 1 #20
+  n_classes : 3
+  eval_batch_size : 16
+
+	if cfg.wandb.use_wandb: 
+        wandb.init( project=cfg.wandb.project_name, # project name
+                    name=cfg.wandb.exp_name, # Experiment name
+                    entity="sciapponi", # Wandb account (must change after login)
+                    config = {  "lr": cfg.train.lr, 
+                                "n_epochs":cfr.train.n_epochs, 
+                                "n_support":cfg.train.n_support, 
+                                "n_episodes": cfg.train.n_episodes,
+                                "n_classes": cfg.train.n_classes,
+                                "eval_batch_size": cfg.train.eval_batch_size})
+
 	global global_step
 	global device 
 
@@ -160,6 +185,7 @@ def train(cfg)-> None:
 	if cfg.deterministic:
 		set_reproducibility(random_seed)
 		g_torch = torch.Generator()
+
 		g_np = np.random.default_rng (seed=random_seed)
 
 	# Datasets
@@ -218,8 +244,16 @@ def train(cfg)-> None:
 		writer.add_scalar('Validation/Loss', val_loss, epoch)
 		writer.add_scalar('Validation/Accuracy', val_metric, epoch)
 
+		if cfg.wandb.use_wandb:
+    	wandb.log({"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_metric})
+
 	# Save the best model
 	print("Finished training.")
+
+	if cfg.wandb.use_wandb:
+  	wandb.finish()
+
+
 	torch.save(best_model, os.path.join(output_dir, 'model.pt'))
 
 

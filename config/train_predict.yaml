@@ -18,3 +18,9 @@ train:
 logging:
   log_dir: "logs"
   log_interval: 1 #episodes
+
+# WANDB parameters.
+wandb:
+  use_wandb: True
+  project_name: "LyricStyleSpace"
+  exp_name: "LyricStyleSpace_train"
