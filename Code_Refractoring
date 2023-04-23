@@ -1,12 +1,12 @@
 Files:
 
-- train.py (main)
+- train.py (main) done
 - models.py - done
-- create_dataset.py
+- data_processing.py done
 - utils.py
 
 Notes:
 
-- Use tensorboard
-- preprocessing -> create_dataset.py
-- argparse -> Da gestire (hydra con config-> Dalla config folder)
+- Use wandb done
+- preprocessing -> data_processing.py done
+- argparse -> Da gestire (hydra con config-> Dalla config folder) done
