@@ -137,14 +137,6 @@ def test_step(model,train_eval_sampler,val_sampler,loss_fn):
 # Training Loop
 @hydra.main(version_base=None, config_path='config', config_name='train_predict')
 def train(cfg)-> None:
-	
-	    lr: 0.0005
-  n_epochs: 1 #5
-  n_support : 4
-  n_query : 5
-  n_episodes : 1 #20
-  n_classes : 3
-  eval_batch_size : 16
 
 	if cfg.wandb.use_wandb: 
         wandb.init( project=cfg.wandb.project_name, # project name
