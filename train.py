@@ -237,7 +237,7 @@ def train(cfg)-> None:
 		writer.add_scalar('Validation/Accuracy', val_metric, epoch)
 
 		if cfg.wandb.use_wandb:
-    	wandb.log({"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_metric})
+    	wandb.log({"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_metric, "lr": lr})
 
 	# Save the best model
 	print("Finished training.")
