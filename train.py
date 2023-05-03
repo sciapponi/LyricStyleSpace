@@ -59,44 +59,60 @@ def visualize_embeddings(embeddings, labels,label_mappings):
   plt.legend(loc="best", markerscale=1)
   plt.show()
 
+class EarlyStopper:
+    def __init__(self, patience=1, min_delta=0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.min_validation_loss = np.inf
+
+    def early_stop(self, validation_loss):
+        if validation_loss < self.min_validation_loss:
+            self.min_validation_loss = validation_loss
+            self.counter = 0
+        elif validation_loss > (self.min_validation_loss + self.min_delta):
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True
+        return False
 
 def train_step(model,train_sampler,optimizer,loss_fn,writer,log_interval = 0,max_grad_norm=0):        	
-	global global_step
+    global global_step
 
-	model.train()
-	with torch.enable_grad():
-		for idx,batch in enumerate(tqdm(train_sampler,position=1)):
-			# Zero the gradients and clear the accumulated loss
-			optimizer.zero_grad()
+    model.train()
+    with torch.enable_grad():
+        for idx,batch in enumerate(tqdm(train_sampler,position=1)):
+            # Zero the gradients and clear the accumulated loss
+            optimizer.zero_grad()
 
-			# Move to device
-			batch = tuple(t.to(device) for t in batch)
-			query_input_ids,query_attention_mask,query_label,support_input_ids,support_attention_mask,support_label = batch
+            # Move to device
+            batch = tuple(t.to(device) for t in batch)
+            query_input_ids,query_attention_mask,query_label,support_input_ids,support_attention_mask,support_label = batch
 
-			# Compute loss
-			pred = model(query_input_ids,query_attention_mask, support_input_ids,support_attention_mask,support_label)
-			loss = loss_fn(pred, query_label)
-			loss.backward()
+            # Compute loss
+            pred = model(query_input_ids,query_attention_mask, support_input_ids,support_attention_mask,support_label)
+            loss = loss_fn(pred, query_label)
+            loss.backward()
 
-			# Clip gradients if necessary
-			if max_grad_norm > 0:
-				clip_grad_norm_(model.parameters(), max_grad_norm)
+            # Clip gradients if necessary
+            if max_grad_norm > 0:
+                clip_grad_norm_(model.parameters(), max_grad_norm)
 
-			# Optimize
-			optimizer.step()
+            # Optimize
+            optimizer.step()
+            
+            # Log training loss
+            train_loss = loss.item()
+            if log_interval > 0 and global_step % log_interval == 0:
+                writer.add_scalar('Training/Loss_IT', train_loss, global_step)
+            
+            # Increment the global step
+            global_step+=1
 
-			# Log training loss
-			train_loss = loss.item()
-			if log_interval > 0 and global_step % log_interval == 0:
-				writer.add_scalar('Training/Loss_IT', train_loss, global_step)
-			
-			# Increment the global step
-			global_step+=1
+            # Zero the gradients when exiting a train step
+            optimizer.zero_grad()
 
-			# Zero the gradients when exiting a train step
-			optimizer.zero_grad()
-
-	return loss.item()
+    return loss.item()
 
 
 def test_step(model,train_eval_sampler,val_sampler,loss_fn): 
@@ -127,134 +143,132 @@ def test_step(model,train_eval_sampler,val_sampler,loss_fn):
       preds = torch.cat(_preds, dim=0)
       targets = torch.cat(_targets, dim=0)
       val_loss = loss_fn(preds, targets).item()
+      
       val_metric = (pred.argmax(dim=1) == target).float().mean().item()
   return val_loss,val_metric
-
-
-
 
 
 # Training Loop
 @hydra.main(version_base=None, config_path='config', config_name='train_predict')
 def train(cfg)-> None:
+    early_stopper = EarlyStopper(patience=cfg.train.es_patience, min_delta=cfg.train.es_min_delta)
+    if cfg.wandb.use_wandb: 
+        wandb.init( 
+            project=cfg.wandb.project_name,
+            name=cfg.wandb.exp_name,
+            entity="tcortecchia",
+            config = {	"lr": cfg.train.lr,
+                         "n_epochs":cfg.train.n_epochs, 
+                        "n_support":cfg.train.n_support, 
+                        "n_episodes": cfg.train.n_episodes,
+                        "n_classes": cfg.train.n_classes,
+                        "eval_batch_size": cfg.train.eval_batch_size})
+    global global_step
+    global device 
 
-	if cfg.wandb.use_wandb: 
-		wandb.init( 
-			project=cfg.wandb.project_name,
-			name=cfg.wandb.exp_name,
-			entity="tcortecchia",
-			config = {	"lr": cfg.train.lr,
-	     				"n_epochs":cfg.train.n_epochs, 
-						"n_support":cfg.train.n_support, 
-						"n_episodes": cfg.train.n_episodes,
-						"n_classes": cfg.train.n_classes,
-						"eval_batch_size": cfg.train.eval_batch_size})
-	global global_step
-	global device 
+    global_step = 0
 
-	global_step = 0
+    # Reading configs
+    random_seed=cfg.seed
+    data_path=cfg.data_path
+    model_ckpt = cfg.model_ckpt
+    device = cfg.device
 
-	# Reading configs
-	random_seed=cfg.seed
-	data_path=cfg.data_path
-	model_ckpt = cfg.model_ckpt
-	device = cfg.device
+    learning_rate = cfg.train.lr
+    num_epochs = cfg.train.n_epochs
+    n_support = cfg.train.n_support
+    n_query = cfg.train.n_query
+    n_episodes = cfg.train.n_episodes
+    n_classes = cfg.train.n_classes
+    eval_batch_size = cfg.train.eval_batch_size
+    output_dir = cfg.train.output_dir
+    max_grad_norm = cfg.train.max_grad_norm
 
-	learning_rate = cfg.train.lr
-	num_epochs = cfg.train.n_epochs
-	n_support = cfg.train.n_support
-	n_query = cfg.train.n_query
-	n_episodes = cfg.train.n_episodes
-	n_classes = cfg.train.n_classes
-	eval_batch_size = cfg.train.eval_batch_size
-	output_dir = cfg.train.output_dir
-	max_grad_norm = cfg.train.max_grad_norm
+    log_dir = cfg.logging.log_dir
+    log_interval = cfg.logging.log_interval
+    
+    # Reproducibility settings
+    if cfg.deterministic:
+        set_reproducibility(random_seed)
+        g_torch = torch.Generator()
 
-	log_dir = cfg.logging.log_dir
-	log_interval = cfg.logging.log_interval
-	
-	# Reproducibility settings
-	if cfg.deterministic:
-		set_reproducibility(random_seed)
-		g_torch = torch.Generator()
+        g_np = np.random.default_rng (seed=random_seed)
 
-		g_np = np.random.default_rng (seed=random_seed)
+    # Datasets
+    dataset = load(data_path)
+    artists_mappings = dataset['train'].features['artist'].names
+    train_features, val_features, test_features  = get_features(dataset, model_ckpt)	
+    
+    # Create samplers
+    episodic_sampler = EpisodicSampler(MyDataset(train_features),
+                                    n_support=n_support,
+                                    n_query=n_query,
+                                    n_episodes=n_episodes,
+                                    n_classes=n_classes)
 
-	# Datasets
-	dataset = load(data_path)
-	artists_mappings = dataset['train'].features['artist'].names
-	train_features, val_features, test_features  = get_features(dataset, model_ckpt)	
-	
-	# Create samplers
-	episodic_sampler = EpisodicSampler(MyDataset(train_features),
-									n_support=n_support,
-									n_query=n_query,
-									n_episodes=n_episodes,
-									n_classes=n_classes)
+    # The train_eval_sampler is used to computer prototypes over the full dataset
+    train_sampler = BaseSampler(MyDataset(train_features), batch_size=eval_batch_size)
+    val_sampler = BaseSampler(MyDataset(val_features), batch_size=eval_batch_size)
 
-	# The train_eval_sampler is used to computer prototypes over the full dataset
-	train_sampler = BaseSampler(MyDataset(train_features), batch_size=eval_batch_size)
-	val_sampler = BaseSampler(MyDataset(val_features), batch_size=eval_batch_size)
-	test_sampler = 	val_sampler = BaseSampler(MyDataset(test_features), batch_size=eval_batch_size)
+    # create model	
+    model = PrototypicalTransformerModel(model_ckpt,128).to(device)
+    
+    # Training procedure set up
+    best_metric = None
+    best_model: Dict[str, torch.Tensor] = dict()
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    writer = SummaryWriter(log_dir=log_dir
+            )
+    loss_fn = torch.nn.CrossEntropyLoss()
+    parameters = (p for p in model.parameters() if p.requires_grad)
+    optimizer = torch.optim.Adam(parameters, lr=learning_rate)
 
-	# create model	
-	model = PrototypicalTransformerModel(model_ckpt,128).to(device)
-	
-	# Training procedure set up
-	best_metric = None
-	best_model: Dict[str, torch.Tensor] = dict()
-	if not os.path.exists(log_dir):
-		os.makedirs(log_dir)
-	writer = SummaryWriter(log_dir=log_dir
-			)
-	loss_fn = torch.nn.CrossEntropyLoss()
-	parameters = (p for p in model.parameters() if p.requires_grad)
-	optimizer = torch.optim.Adam(parameters, lr=learning_rate)
+    # Training start
+    print('Beginning training')
+    for epoch in tqdm(range(num_epochs),position=0):
+        train_loss = train_step(model,episodic_sampler,optimizer,loss_fn,writer,log_interval,max_grad_norm)
+        val_loss,val_metric = test_step(model,train_sampler,val_sampler,loss_fn)
+        lr = optimizer.param_groups[0]['lr']
+        # Update best model
+        if best_metric is None or val_metric > best_metric:
+            best_metric = val_metric
+            best_model_state = model.state_dict()
+            for k, t in best_model_state.items():
+                best_model_state[k] = t.cpu().detach()
+            best_model = best_model_state
 
-	# Training start
-	print('Beginning training')
-	for epoch in tqdm(range(num_epochs),position=0):
-		train_loss = train_step(model,episodic_sampler,optimizer,loss_fn,writer,log_interval,max_grad_norm)
-		val_loss,val_metric = test_step(model,train_sampler,val_sampler,loss_fn)
-		lr = optimizer.param_groups[0]['lr']
-		# Update best model
-		if best_metric is None or val_metric > best_metric:
-			best_metric = val_metric
-			best_model_state = model.state_dict()
-			for k, t in best_model_state.items():
-				best_model_state[k] = t.cpu().detach()
-			best_model = best_model_state
+        # Log metrics
+        tqdm.write(f'Training Loss: {train_loss}')
+        tqdm.write(f'Validation loss: {val_loss}')
+        tqdm.write(f'Validation accuracy: {val_metric}')
+        writer.add_scalar('Hyperparameters/Learning Rate', lr, epoch)
+        writer.add_scalar('Training/Loss', train_loss, epoch)
+        writer.add_scalar('Validation/Loss', val_loss, epoch)
+        writer.add_scalar('Validation/Accuracy', val_metric, epoch)
 
-		# Log metrics
-		tqdm.write(f'Training Loss: {train_loss}')
-		tqdm.write(f'Validation loss: {val_loss}')
-		tqdm.write(f'Validation accuracy: {val_metric}')
-		writer.add_scalar('Hyperparameters/Learning Rate', lr, epoch)
-		writer.add_scalar('Training/Loss', train_loss, epoch)
-		writer.add_scalar('Validation/Loss', val_loss, epoch)
-		writer.add_scalar('Validation/Accuracy', val_metric, epoch)
+        if cfg.wandb.use_wandb: wandb.log({"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_metric, "lr": lr})
+        if EarlyStopper.early_stop(validation_loss=val_loss): 
+            tqdm.write('Early stopping')
+            break
+    # Save the best model
+    print("Finished training.")
 
-		if cfg.wandb.use_wandb: wandb.log({"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_metric, "lr": lr})
-	# Save the best model
-	print("Finished training.")
+    torch.save(best_model, os.path.join(output_dir, 'model.pt'))
 
-	if cfg.wandb.use_wandb:
-  		wandb.finish()
-		
-	torch.save(best_model, os.path.join(output_dir, 'model.pt'))
+    if cfg.wandb.use_wandb:
+          wandb.finish()
 
-
-	# Model evaluation 
-	best_model = PrototypicalTransformerModel(model_ckpt,128).to(device)
-	best_model.load_state_dict(torch.load('/content/out/prototype/model.pt'))
-	best_model.eval()
-	
-	# Visualize the new embeddings 
-	umap_visualizer = umap.UMAP()
-	embeddings, labels = get_all_embeddings(MyDataset(train_features), best_model,device)
-	embeddings_reduced = umap_visualizer.fit_transform(embeddings.cpu().numpy())
-	visualize_embeddings(embeddings_reduced, labels.cpu().numpy(),artists_mappings)
-
+    # # Model evaluation 
+    # best_model = PrototypicalTransformerModel(model_ckpt,128).to(device)
+    # best_model.load_state_dict(torch.load('/content/out/prototype/model.pt'))
+    # best_model.eval()
+    
+    # # Visualize the new embeddings 
+    # umap_visualizer = umap.UMAP()
+    # embeddings, labels = get_all_embeddings(MyDataset(train_features), best_model,device)
+    # embeddings_reduced = umap_visualizer.fit_transform(embeddings.cpu().numpy())
+    # fig = visualize_embeddings(embeddings_reduced, labels.cpu().numpy(),artists_mappings)
 
 if __name__=="__main__":
-	train()
+    train()
