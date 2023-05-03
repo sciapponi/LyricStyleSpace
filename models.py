@@ -87,7 +87,6 @@ class PrototypicalTransformerModel(nn.Module):
           raise ValueError("No prototypes set or support vectors have been provided")
 
         dist = self.__euclidean_distance__(query_encoding, prototypes)
-        clear_cache()
 
         return - dist
     
@@ -105,7 +104,7 @@ class MetricTransformerModel(torch.nn.Module):
     def __init__(self,
                  model_name:str, 
                  hidden_dims:Tuple[int]=(128,)):
-        super(TransformerModel, self).__init__()
+        super(MetricTransformerModel, self).__init__()
         self.transformer = AutoModel.from_pretrained(model_name)
         self.dense_layers = torch.nn.ModuleList()
         last_hidden_size = self.transformer.config.hidden_size

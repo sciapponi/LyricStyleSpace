@@ -214,10 +214,8 @@ def train(cfg)-> None:
 	# Training start
 	print('Beginning training')
 	for epoch in tqdm(range(num_epochs),position=0):
-
 		train_loss = train_step(model,episodic_sampler,optimizer,loss_fn,writer,log_interval,max_grad_norm)
-		val_loss,val_metric = test_step(model,train_sampler,val_sampler)
-	
+		val_loss,val_metric = test_step(model,train_sampler,val_sampler,loss_fn)
 		lr = optimizer.param_groups[0]['lr']
 		# Update best model
 		if best_metric is None or val_metric > best_metric:
