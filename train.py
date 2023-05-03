@@ -139,16 +139,16 @@ def test_step(model,train_eval_sampler,val_sampler,loss_fn):
 def train(cfg)-> None:
 
 	if cfg.wandb.use_wandb: 
-        wandb.init( project=cfg.wandb.project_name, # project name
-                    name=cfg.wandb.exp_name, # Experiment name
-                    entity="sciapponi", # Wandb account (must change after login)
-                    config = {  "lr": cfg.train.lr, 
-                                "n_epochs":cfr.train.n_epochs, 
-                                "n_support":cfg.train.n_support, 
-                                "n_episodes": cfg.train.n_episodes,
-                                "n_classes": cfg.train.n_classes,
-                                "eval_batch_size": cfg.train.eval_batch_size})
-
+		wandb.init( 
+			project=cfg.wandb.project_name,
+			name=cfg.wandb.exp_name,
+			entity="tcortecchia",
+			config = {	"lr": cfg.train.lr,
+	     				"n_epochs":cfg.train.n_epochs, 
+						"n_support":cfg.train.n_support, 
+						"n_episodes": cfg.train.n_episodes,
+						"n_classes": cfg.train.n_classes,
+						"eval_batch_size": cfg.train.eval_batch_size})
 	global global_step
 	global device 
 
@@ -236,16 +236,13 @@ def train(cfg)-> None:
 		writer.add_scalar('Validation/Loss', val_loss, epoch)
 		writer.add_scalar('Validation/Accuracy', val_metric, epoch)
 
-		if cfg.wandb.use_wandb:
-    	wandb.log({"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_metric, "lr": lr})
-
+		if cfg.wandb.use_wandb: wandb.log({"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_metric, "lr": lr})
 	# Save the best model
 	print("Finished training.")
 
 	if cfg.wandb.use_wandb:
-  	wandb.finish()
-
-
+  		wandb.finish()
+		
 	torch.save(best_model, os.path.join(output_dir, 'model.pt'))
 
 

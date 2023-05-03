@@ -2,7 +2,7 @@ deterministic: true
 seed : 42
 data_path: "data/data_self_dump.json"
 model_ckpt: "bert-base-uncased"
-device: "cpu" #"cuda"
+device: "cuda"
 train:
   lr: 0.0005
   n_epochs: 1 #5
